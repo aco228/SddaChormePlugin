@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Sdda Copy Tools",
-  "version": "1.0",
-  "description": "Copy HTML and text from pages with advanced search capabilities",
+  "name": "Sdda",
+  "version": "1.1",
+  "description": "Formats page",
   "permissions": [
     "activeTab",
     "scripting",
