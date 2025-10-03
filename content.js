@@ -136,7 +136,7 @@
   
   function createFloatingWidget() {
 	if (floatingWidget) return;
-	
+
 	// Create floating button
 	floatingWidget = document.createElement('div');
 	floatingWidget.id = 'html-copier-widget';
@@ -150,6 +150,8 @@
 		<div class="widget-content">
 		  <button class="widget-btn" data-action="copyHtml">Copy HTML</button>
 		  <button class="widget-btn" data-action="copyText">Copy Text</button>
+		  <input type="text" class="widget-input" placeholder="Server url..." id="serverUrl">
+		  <button class="widget-btn" data-action="sendToServer">Send to server</button>
 		  <input type="text" class="widget-input" placeholder="Find text..." id="widgetFindText">
 		  <input type="number" class="widget-input" placeholder="Parents" value="0" min="0" max="10" id="widgetParentNum">
 		  <button class="widget-btn" data-action="copyFoundHtml">Copy Found HTML</button>
@@ -160,6 +162,10 @@
 	
 	document.body.appendChild(floatingWidget);
 	
+	chrome.storage.local.get(["serverUrl"], (result) => {
+		document.getElementById('serverUrl').value = result.serverUrl;
+	});
+
 	const button = floatingWidget.querySelector('.widget-button');
 	const panel = floatingWidget.querySelector('.widget-panel');
 	const closeBtn = floatingWidget.querySelector('.widget-close');
@@ -265,10 +271,24 @@
 		result = document.documentElement.outerHTML;
 		await copyToClipboardWidget(result);
 		break;
-		
+
 	  case 'copyText':
 		result = document.body.innerText;
 		await copyToClipboardWidget(result);
+		break;
+
+	  case 'sendToServer':
+		const serverUrl = document.getElementById('serverUrl').value;
+		  if (!serverUrl)
+			  return;
+
+		chrome.storage.local.set({ serverUrl }, () => { });
+
+		const text = document.body.innerText;
+  		const html = document.documentElement.outerHTML;
+
+	  	const apiResponse = await postToServer(serverUrl, text, html);
+	  	await copyToClipboard(apiResponse.id);
 		break;
 		
 	  case 'copyFoundHtml':
@@ -321,6 +341,36 @@
 	}
   }
   
+  async function postToServer(serverUrl, textContent, htmlContent) {
+    try {
+		const request = {
+			html: htmlContent,
+			text: textContent,
+		};
+
+        const response = await fetch(serverUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'  // sending JSON
+            },
+            body: JSON.stringify(request)
+        });
+
+        if (!response.ok) {
+			showStatus(`Server responded with status ${response.status}`);
+            throw new Error(`Server responded with status ${response.status}`);
+        }
+
+        const data = await response.json();  // assuming the server returns JSON
+		showStatus('Received: ' + data.id, showStatus);
+        return data;
+    } catch (error) {
+		showStatus('Error posting to server:');
+        console.error('Error posting to server:', error);
+        throw error;  // re-throw so caller can handle it
+    }
+}
+
   function showWidgetNotification(message) {
 	const notif = document.createElement('div');
 	notif.className = 'widget-notification';

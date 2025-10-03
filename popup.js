@@ -34,6 +34,40 @@ async function getCurrentTab() {
 	}
   }
   
+chrome.storage.local.get(["serverUrl"], (result) => {
+	document.getElementById('serverUrl').value = result.serverUrl;
+});
+
+  async function postToServer(serverUrl, textContent, htmlContent) {
+    try {
+		const request = {
+			html: htmlContent,
+			text: textContent,
+		};
+
+        const response = await fetch(serverUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'  // sending JSON
+            },
+            body: JSON.stringify(request)
+        });
+
+        if (!response.ok) {
+			showStatus(`Server responded with status ${response.status}`);
+            throw new Error(`Server responded with status ${response.status}`);
+        }
+
+        const data = await response.json();  // assuming the server returns JSON
+		showStatus('Received: ' + data.id, showStatus);
+        return data;
+    } catch (error) {
+		showStatus('Error posting to server:');
+        console.error('Error posting to server:', error);
+        throw error;  // re-throw so caller can handle it
+    }
+}
+
   // Copy HTML
   document.getElementById('copyHtml').addEventListener('click', async () => {
 	const html = await executeInTab(() => {
@@ -49,7 +83,28 @@ async function getCurrentTab() {
 	});
 	await copyToClipboard(text);
   });
-  
+
+document.getElementById('sendToServer').addEventListener('click', async () => {
+	const serverUrl = document.getElementById('serverUrl').value;
+	if(!serverUrl){
+		showStatus('server url not defined');
+		return;
+	}
+
+	chrome.storage.local.set({ serverUrl }, () => { });
+
+	const html = await executeInTab(() => {
+		return document.documentElement.outerHTML;
+	});
+	const text = await executeInTab(() => {
+		return document.body.innerText;
+	});
+
+	const apiResponse = await postToServer(serverUrl, text, html);
+	await copyToClipboard(apiResponse.id);
+	showStatus(apiResponse.id);
+});
+
   // Find element and copy HTML
   document.getElementById('copyFoundHtml').addEventListener('click', async () => {
 	const searchText = document.getElementById('findText').value;
